@@ -1,3 +1,3 @@
-##### node REST api Ğ¡°¸ÀıÁ´½Ó
+##### node REST api çš„ å°æ¡ˆä¾‹
 
 https://github.com/zxk0nly1/learn_javascript/tree/master/samples/node/web/rest
