@@ -1,0 +1,17 @@
+{
+  "name": "call_twilio",
+  "version": "1.0.0",
+  "description": "use twilio to call phone number",
+  "main": "call.js",
+  "scripts": {
+    "test": "start"
+  },
+  "keywords": [
+    "node"
+  ],
+  "author": "zxk",
+  "license": "ISC",
+  "dependencies": {
+    "twilio": "^3.39.4"
+  }
+}
