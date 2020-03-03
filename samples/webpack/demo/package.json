@@ -1,0 +1,19 @@
+{
+    "name": "demo",
+    "version": "1.0.0",
+    "description": "webpack的使用demo",
+    "main": "index.js",
+    "dependencies": {},
+    "devDependencies": {
+        "webpack-cli": "^3.3.11"
+    },
+    "scripts": {
+        "dev": "webpack --mode development",
+        "build": "webpack --mode production"
+    },
+    "keywords": [
+        "webpack"
+    ],
+    "author": "Russell Zhou",
+    "license": "MIT"
+}
