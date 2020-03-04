@@ -565,3 +565,645 @@ app.use(controller());
 ```
 
 经过重新整理后的工程`url2-koa`目前具备非常好的模块化，所有处理URL的函数按功能组存放在`controllers`目录，今后我们也只需要不断往这个目录下加东西就可以了，`app.js`保持不变。
+
+### Nunjucks 模板引擎
+
+##### Nunjucks [源码](https://github.com/zxk0nly1/learn_javascript/tree/master/samples/node/web/koa/nunjucks)
+
+Nunjucks是什么东东？其实它是一个模板引擎。
+
+那什么是模板引擎？
+
+模板引擎就是基于模板配合数据构造出字符串输出的一个组件。比如下面的函数就是一个模板引擎：
+
+```javascript
+function examResult (data) {
+    return `${data.name}同学一年级期末考试语文${data.chinese}分，数学${data.math}分，位于年级第${data.ranking}名。`
+}
+```
+
+如果我们输入数据如下：
+
+```javascript
+examResult({
+    name: '小明',
+    chinese: 78,
+    math: 87,
+    ranking: 999
+});
+```
+
+该模板引擎把模板字符串里面对应的变量替换以后，就可以得到以下输出：
+
+```shell
+小明同学一年级期末考试语文78分，数学87分，位于年级第999名。
+```
+
+模板引擎最常见的输出就是输出网页，也就是HTML文本。当然，也可以输出任意格式的文本，比如Text，XML，Markdown等等。
+
+有同学要问了：既然JavaScript的模板字符串可以实现模板功能，那为什么我们还需要另外的模板引擎？
+
+因为JavaScript的模板字符串必须写在JavaScript代码中，要想写出新浪首页这样复杂的页面，是非常困难的。
+
+输出HTML有几个特别重要的问题需要考虑：
+
+#### 转义
+
+对特殊字符要转义，避免受到XSS攻击。比如，如果变量`name`的值不是`小明`，而是`小明<script>...</script>`，模板引擎输出的HTML到了浏览器，就会自动执行恶意JavaScript代码。
+
+#### 格式化
+
+对不同类型的变量要格式化，比如，货币需要变成`12,345.00`这样的格式，日期需要变成`2016-01-01`这样的格式。
+
+#### 简单逻辑
+
+模板还需要能执行一些简单逻辑，比如，要按条件输出内容，需要if实现如下输出：
+
+```powershell
+{{ name }}同学，
+{% if score >= 90 %}
+    成绩优秀，应该奖励
+{% elif score >=60 %}
+    成绩良好，继续努力
+{% else %}
+    不及格，建议回家打屁股
+{% endif %}
+```
+
+所以，我们需要一个功能强大的模板引擎，来完成页面输出的功能。
+
+### Nunjucks
+
+我们选择Nunjucks作为模板引擎。Nunjucks是Mozilla开发的一个纯JavaScript编写的模板引擎，既可以用在Node环境下，又可以运行在浏览器端。但是，主要还是运行在Node环境下，因为浏览器端有更好的模板解决方案，例如MVVM框架。
+
+如果你使用过Python的模板引擎[jinja2](https://www.liaoxuefeng.com/wiki/1016959663602400/1017806952856928)，那么使用Nunjucks就非常简单，两者的语法几乎是一模一样的，因为Nunjucks就是用JavaScript重新实现了jinjia2。
+
+从上面的例子我们可以看到，虽然模板引擎内部可能非常复杂，但是使用一个模板引擎是非常简单的，因为本质上我们只需要构造这样一个函数：
+
+```javascript
+function render(view, model) {
+    // TODO:...
+}
+```
+
+其中，`view`是模板的名称（又称为视图），因为可能存在多个模板，需要选择其中一个。`model`就是数据，在JavaScript中，它就是一个简单的Object。`render`函数返回一个字符串，就是模板的输出。
+
+下面我们来使用Nunjucks这个模板引擎来编写几个HTML模板，并且用实际数据来渲染模板并获得最终的HTML输出。
+
+我们创建一个`use-nunjucks`的VS Code工程结构如下：
+
+```shell
+use-nunjucks/
+|
++- .vscode/
+|  |
+|  +- launch.json <-- VSCode 配置文件
+|
++- views/
+|  |
+|  +- hello.html <-- HTML模板文件
+|
++- app.js <-- 入口js
+|
++- package.json <-- 项目描述文件
+|
++- node_modules/ <-- npm安装的所有依赖包
+```
+
+其中，模板文件存放在`views`目录中。
+
+我们先在`package.json`中添加`nunjucks`的依赖：
+
+```json
+"nunjucks": "2.4.2"
+```
+
+注意，模板引擎是可以独立使用的，并不需要依赖koa。用`npm install`安装所有依赖包。
+
+紧接着，我们要编写使用Nunjucks的函数`render`。怎么写？方法是查看Nunjucks的[官方文档](http://mozilla.github.io/nunjucks/)，仔细阅读后，在`app.js`中编写代码如下：
+
+```javascript
+const nunjucks = require('nunjucks');
+
+function createEnv(path, opts) {
+    var
+        autoescape = opts.autoescape === undefined ? true : opts.autoescape,
+        noCache = opts.noCache || false,
+        watch = opts.watch || false,
+        throwOnUndefined = opts.throwOnUndefined || false,
+        env = new nunjucks.Environment(
+            new nunjucks.FileSystemLoader('views', {
+                noCache: noCache,
+                watch: watch,
+            }), {
+                autoescape: autoescape,
+                throwOnUndefined: throwOnUndefined
+            });
+    if (opts.filters) {
+        for (var f in opts.filters) {
+            env.addFilter(f, opts.filters[f]);
+        }
+    }
+    return env;
+}
+
+var env = createEnv('views', {
+    watch: true,
+    filters: {
+        hex: function (n) {
+            return '0x' + n.toString(16);
+        }
+    }
+});
+```
+
+变量`env`就表示Nunjucks模板引擎对象，它有一个`render(view, model)`方法，正好传入`view`和`model`两个参数，并返回字符串。
+
+创建`env`需要的参数可以查看文档获知。我们用`autoescape = opts.autoescape && true`这样的代码给每个参数加上默认值，最后使用`new nunjucks.FileSystemLoader('views')`创建一个文件系统加载器，从`views`目录读取模板。
+
+我们编写一个`hello.html`模板文件，放到`views`目录下，内容如下：
+
+```html
+<h1>Hello {{ name }}</h1>
+```
+
+然后，我们就可以用下面的代码来渲染这个模板：
+
+```javascript
+var s = env.render('hello.html', { name: '小明' });
+console.log(s);
+```
+
+获得输出如下：
+
+```shell
+<h1>Hello 小明</h1>
+```
+
+咋一看，这和使用JavaScript模板字符串没啥区别嘛。不过，试试：
+
+```javascript
+var s = env.render('hello.html', { name: '<script>alert("小明")</script>' });
+console.log(s);
+```
+
+获得输出如下：
+
+```shell
+<h1>Hello &lt;script&gt;alert("小明")&lt;/script&gt;</h1>
+```
+
+这样就避免了输出恶意脚本。
+
+此外，可以使用Nunjucks提供的功能强大的tag，编写条件判断、循环等功能，例如：
+
+```javascript
+<!-- 循环输出名字 -->
+<body>
+    <h3>Fruits List</h3>
+    {% for f in fruits %}
+    <p>{{ f }}</p>
+    {% endfor %}
+</body>
+```
+
+Nunjucks模板引擎最强大的功能在于模板的继承。仔细观察各种网站可以发现，网站的结构实际上是类似的，头部、尾部都是固定格式，只有中间页面部分内容不同。如果每个模板都重复头尾，一旦要修改头部或尾部，那就需要改动所有模板。
+
+更好的方式是使用继承。先定义一个基本的网页框架`base.html`：
+
+```javascript
+<html><body>
+{% block header %} <h3>Unnamed</h3> {% endblock %}
+{% block body %} <div>No body</div> {% endblock %}
+{% block footer %} <div>copyright</div> {% endblock %}
+</body>
+```
+
+`base.html`定义了三个可编辑的块，分别命名为`header`、`body`和`footer`。子模板可以有选择地对块进行重新定义：
+
+```javascript
+{% extends 'base.html' %}
+
+{% block header %}<h1>{{ header }}</h1>{% endblock %}
+
+{% block body %}<p>{{ body }}</p>{% endblock %}
+```
+
+然后，我们对子模板进行渲染：
+
+```javascript
+console.log(env.render('extend.html', {
+    header: 'Hello',
+    body: 'bla bla bla...'
+}));
+```
+
+输出HTML如下：
+
+```html
+<html><body>
+<h1>Hello</h1>
+<p>bla bla bla...</p>
+<div>copyright</div> <-- footer没有重定义，所以仍使用父模板的内容
+</body>
+```
+
+### 性能
+
+最后我们要考虑一下Nunjucks的性能。
+
+对于模板渲染本身来说，速度是非常非常快的，因为就是拼字符串嘛，纯CPU操作。
+
+性能问题主要出现在从文件读取模板内容这一步。这是一个IO操作，在Node.js环境中，我们知道，单线程的JavaScript最不能忍受的就是同步IO，但Nunjucks默认就使用同步IO读取模板文件。
+
+好消息是Nunjucks会缓存已读取的文件内容，也就是说，模板文件最多读取一次，就会放在内存中，后面的请求是不会再次读取文件的，只要我们指定了`noCache: false`这个参数。
+
+在开发环境下，可以关闭cache，这样每次重新加载模板，便于实时修改模板。在生产环境下，一定要打开cache，这样就不会有性能问题。
+
+Nunjucks也提供了异步读取的方式，但是这样写起来很麻烦，有简单的写法我们就不会考虑复杂的写法。保持代码简单是可维护性的关键。
+
+----
+
+#### 使用MVC
+
+------
+
+### MVC
+
+我们已经可以用koa处理不同的URL，还可以用Nunjucks渲染模板。现在，是时候把这两者结合起来了！
+
+当用户通过浏览器请求一个URL时，koa将调用某个异步函数处理该URL。在这个异步函数内部，我们用一行代码：
+
+```javascript
+ctx.render('home.html', { name: 'Michael' });
+```
+
+通过Nunjucks把数据用指定的模板渲染成HTML，然后输出给浏览器，用户就可以看到渲染后的页面了：
+
+![mvc](https://www.liaoxuefeng.com/files/attachments/1100575804488000/l)
+
+这就是传说中的MVC：Model-View-Controller，中文名“模型-视图-控制器”。
+
+异步函数是C：Controller，Controller负责业务逻辑，比如检查用户名是否存在，取出用户信息等等；
+
+包含变量`{{ name }}`的模板就是V：View，View负责显示逻辑，通过简单地替换一些变量，View最终输出的就是用户看到的HTML。
+
+MVC中的Model在哪？Model是用来传给View的，这样View在替换变量的时候，就可以从Model中取出相应的数据。
+
+上面的例子中，Model就是一个JavaScript对象：
+
+```json
+{ name: 'Russell' }
+```
+
+下面，我们根据原来的`url2-koa`创建工程`view-koa`，把koa2、Nunjucks整合起来，然后，把原来直接输出字符串的方式，改为`ctx.render(view, model)`的方式。
+
+工程`view-koa`结构如下：
+
+```shell
+view-koa/
+|
++- .vscode/
+|  |
+|  +- launch.json <-- VSCode 配置文件
+|
++- controllers/ <-- Controller
+|
++- views/ <-- html模板文件
+|
++- static/ <-- 静态资源文件
+|
++- controller.js <-- 扫描注册Controller
+|
++- app.js <-- 使用koa的js
+|
++- package.json <-- 项目描述文件
+|
++- node_modules/ <-- npm安装的所有依赖包
+```
+
+在`package.json`中，我们将要用到的依赖包有：
+
+```json
+"koa": "2.0.0",
+"koa-bodyparser": "3.2.0",
+"koa-router": "7.0.0",
+"nunjucks": "2.4.2",
+"mime": "1.3.4",
+"mz": "2.4.0"
+```
+
+先用`npm install`安装依赖包。
+
+然后，我们准备编写以下两个Controller：
+
+#### 处理首页 GET /
+
+我们定义一个async函数处理首页URL`/`：
+
+```javascript
+async (ctx, next) => {
+    ctx.render('index.html', {
+        title: 'Welcome'
+    });
+}
+```
+
+注意到koa并没有在`ctx`对象上提供`render`方法，这里我们假设应该这么使用，这样，我们在编写Controller的时候，最后一步调用`ctx.render(view, model)`就完成了页面输出。
+
+#### 处理登录请求 POST /signin
+
+我们再定义一个async函数处理登录请求`/signin`：
+
+```javascript
+async (ctx, next) => {
+    var
+        email = ctx.request.body.email || '',
+        password = ctx.request.body.password || '';
+    if (email === 'admin@example.com' && password === '123456') {
+        // 登录成功:
+        ctx.render('signin-ok.html', {
+            title: 'Sign In OK',
+            name: 'Mr Node'
+        });
+    } else {
+        // 登录失败:
+        ctx.render('signin-failed.html', {
+            title: 'Sign In Failed'
+        });
+    }
+}
+```
+
+由于登录请求是一个POST，我们就用`ctx.request.body.<name>`拿到POST请求的数据，并给一个默认值。
+
+登录成功时我们用`signin-ok.html`渲染，登录失败时我们用`signin-failed.html`渲染，所以，我们一共需要以下3个View：
+
+- index.html
+- signin-ok.html
+- signin-failed.html
+
+### 编写View
+
+在编写View的时候，我们实际上是在编写HTML页。为了让页面看起来美观大方，使用一个现成的CSS框架是非常有必要的。我们用[Bootstrap](http://getbootstrap.com/)这个CSS框架。从首页下载zip包后解压，我们把所有静态资源文件放到`/static`目录下：
+
+```powershell
+view-koa/
+|
++- static/
+   |
+   +- css/ <- 存放bootstrap.css等
+   |
+   +- fonts/ <- 存放字体文件
+   |
+   +- js/ <- 存放bootstrap.js等   
+```
+
+这样我们在编写HTML的时候，可以直接用Bootstrap的CSS，像这样：
+
+```html
+<link rel="stylesheet" href="/static/css/bootstrap.css">
+```
+
+现在，在使用MVC之前，第一个问题来了，如何处理静态文件？
+
+我们把所有静态资源文件全部放入`/static`目录，目的就是能统一处理静态文件。在koa中，我们需要编写一个middleware，处理以`/static/`开头的URL。
+
+### 编写middleware
+
+我们来编写一个处理静态文件的middleware。编写middleware实际上一点也不复杂。我们先创建一个`static-files.js`的文件，编写一个能处理静态文件的middleware：
+
+```javascript
+const path = require('path');
+const mime = require('mime');
+const fs = require('mz/fs');
+
+// url: 类似 '/static/'
+// dir: 类似 __dirname + '/static'
+function staticFiles(url, dir) {
+    return async (ctx, next) => {
+        let rpath = ctx.request.path;
+        // 判断是否以指定的url开头:
+        if (rpath.startsWith(url)) {
+            // 获取文件完整路径:
+            let fp = path.join(dir, rpath.substring(url.length));
+            // 判断文件是否存在:
+            if (await fs.exists(fp)) {
+                // 查找文件的mime:
+                ctx.response.type = mime.lookup(rpath);
+                // 读取文件内容并赋值给response.body:
+                ctx.response.body = await fs.readFile(fp);
+            } else {
+                // 文件不存在:
+                ctx.response.status = 404;
+            }
+        } else {
+            // 不是指定前缀的URL，继续处理下一个middleware:
+            await next();
+        }
+    };
+}
+
+module.exports = staticFiles;
+```
+
+`staticFiles`是一个普通函数，它接收两个参数：URL前缀和一个目录，然后返回一个async函数。这个async函数会判断当前的URL是否以指定前缀开头，如果是，就把URL的路径视为文件，并发送文件内容。如果不是，这个async函数就不做任何事情，而是简单地调用`await next()`让下一个middleware去处理请求。
+
+我们使用了一个`mz`的包，并通过`require('mz/fs');`导入。`mz`提供的API和Node.js的`fs`模块完全相同，但`fs`模块使用回调，而`mz`封装了`fs`对应的函数，并改为Promise。这样，我们就可以非常简单的用`await`调用`mz`的函数，而不需要任何回调。
+
+所有的第三方包都可以通过npm官网搜索并查看其文档：
+
+<https://www.npmjs.com/>
+
+最后，这个middleware使用起来也很简单，在`app.js`里加一行代码：
+
+```javascript
+let staticFiles = require('./static-files');
+app.use(staticFiles('/static/', __dirname + '/static'));
+```
+
+*注意*：也可以去npm搜索能用于koa2的处理静态文件的包并直接使用。
+
+### 集成Nunjucks
+
+集成Nunjucks实际上也是编写一个middleware，这个middleware的作用是给`ctx`对象绑定一个`render(view, model)`的方法，这样，后面的Controller就可以调用这个方法来渲染模板了。
+
+我们创建一个`templating.js`来实现这个middleware：
+
+```javascript
+const nunjucks = require('nunjucks');
+
+function createEnv(path, opts) {
+    var
+        autoescape = opts.autoescape === undefined ? true : opts.autoescape,
+        noCache = opts.noCache || false,
+        watch = opts.watch || false,
+        throwOnUndefined = opts.throwOnUndefined || false,
+        env = new nunjucks.Environment(
+            new nunjucks.FileSystemLoader(path || 'views', {
+                noCache: noCache,
+                watch: watch,
+            }), {
+                autoescape: autoescape,
+                throwOnUndefined: throwOnUndefined
+            });
+    if (opts.filters) {
+        for (var f in opts.filters) {
+            env.addFilter(f, opts.filters[f]);
+        }
+    }
+    return env;
+}
+
+function templating(path, opts) {
+    // 创建Nunjucks的env对象:
+    var env = createEnv(path, opts);
+    return async (ctx, next) => {
+        // 给ctx绑定render函数:
+        ctx.render = function (view, model) {
+            // 把render后的内容赋值给response.body:
+            ctx.response.body = env.render(view, Object.assign({}, ctx.state || {}, model || {}));
+            // 设置Content-Type:
+            ctx.response.type = 'text/html';
+        };
+        // 继续处理请求:
+        await next();
+    };
+}
+
+module.exports = templating;
+```
+
+注意到`createEnv()`函数和前面使用Nunjucks时编写的函数是一模一样的。我们主要关心`tempating()`函数，它会返回一个middleware，在这个middleware中，我们只给`ctx`“安装”了一个`render()`函数，其他什么事情也没干，就继续调用下一个middleware。
+
+使用的时候，我们在`app.js`添加如下代码：
+
+```javascript
+const isProduction = process.env.NODE_ENV === 'production';
+
+app.use(templating('views', {
+    noCache: !isProduction,
+    watch: !isProduction
+}));
+```
+
+这里我们定义了一个常量`isProduction`，它判断当前环境是否是production环境。如果是，就使用缓存，如果不是，就关闭缓存。在开发环境下，关闭缓存后，我们修改View，可以直接刷新浏览器看到效果，否则，每次修改都必须重启Node程序，会极大地降低开发效率。
+
+Node.js在全局变量`process`中定义了一个环境变量`env.NODE_ENV`，为什么要使用该环境变量？因为我们在开发的时候，环境变量应该设置为`'development'`，而部署到服务器时，环境变量应该设置为`'production'`。在编写代码的时候，要根据当前环境作不同的判断。
+
+*注意*：生产环境上必须配置环境变量`NODE_ENV = 'production'`，而开发环境不需要配置，实际上`NODE_ENV`可能是`undefined`，所以判断的时候，不要用`NODE_ENV === 'development'`。
+
+类似的，我们在使用上面编写的处理静态文件的middleware时，也可以根据环境变量判断：
+
+```javascript
+if (! isProduction) {
+    let staticFiles = require('./static-files');
+    app.use(staticFiles('/static/', __dirname + '/static'));
+}
+```
+
+这是因为在生产环境下，静态文件是由部署在最前面的反向代理服务器（如Nginx）处理的，Node程序不需要处理静态文件。而在开发环境下，我们希望koa能顺带处理静态文件，否则，就必须手动配置一个反向代理服务器，这样会导致开发环境非常复杂。
+
+### 编写View
+
+在编写View的时候，非常有必要先编写一个`base.html`作为骨架，其他模板都继承自`base.html`，这样，才能大大减少重复工作。
+
+编写HTML不在本教程的讨论范围之内。这里我们参考Bootstrap的官网简单编写了`base.html`。
+
+### 运行
+
+一切顺利的话，这个`view-koa`工程应该可以顺利运行。运行前，我们再检查一下`app.js`里的middleware的顺序：
+
+第一个middleware是记录URL以及页面执行时间：
+
+```javascript
+app.use(async (ctx, next) => {
+    console.log(`Process ${ctx.request.method} ${ctx.request.url}...`);
+    var
+        start = new Date().getTime(),
+        execTime;
+    await next();
+    execTime = new Date().getTime() - start;
+    ctx.response.set('X-Response-Time', `${execTime}ms`);
+});
+```
+
+第二个middleware处理静态文件：
+
+```javascript
+if (! isProduction) {
+    let staticFiles = require('./static-files');
+    app.use(staticFiles('/static/', __dirname + '/static'));
+}
+```
+
+第三个middleware解析POST请求：
+
+```javascript
+app.use(bodyParser());
+```
+
+第四个middleware负责给`ctx`加上`render()`来使用Nunjucks：
+
+```javascript
+app.use(templating('view', {
+    noCache: !isProduction,
+    watch: !isProduction
+}));
+```
+
+最后一个middleware处理URL路由：
+
+```javascript
+app.use(controller());
+```
+
+现在，在VS Code中运行代码，不出意外的话，在浏览器输入`localhost:3000/`，可以看到首页内容：
+
+![koa-index](https://www.liaoxuefeng.com/files/attachments/1100575873273408/l)
+
+直接在首页登录，如果输入正确的Email和Password，进入登录成功的页面：
+
+![koa-signin-ok](https://www.liaoxuefeng.com/files/attachments/1100575896762496/l)
+
+如果输入的Email和Password不正确，进入登录失败的页面：
+
+![koa-signin-failed](https://www.liaoxuefeng.com/files/attachments/1100575918131328/l)
+
+怎么判断正确的Email和Password？目前我们在`signin.js`中是这么判断的：
+
+```javascript
+if (email === 'admin@example.com' && password === '123456') {
+    ...
+}
+```
+
+当然，真实的网站会根据用户输入的Email和Password去数据库查询并判断登录是否成功，不过这需要涉及到Node.js环境如何操作数据库，我们后面再讨论。
+
+### 扩展
+
+注意到`ctx.render`内部渲染模板时，Model对象并不是传入的model变量，而是：
+
+```javascript
+Object.assign({}, ctx.state || {}, model || {})
+```
+
+这个小技巧是为了扩展。
+
+首先，`model || {}`确保了即使传入`undefined`，model也会变为默认值`{}`。`Object.assign()`会把除第一个参数外的其他参数的所有属性复制到第一个参数中。第二个参数是`ctx.state || {}`，这个目的是为了能把一些公共的变量放入`ctx.state`并传给View。
+
+例如，某个middleware负责检查用户权限，它可以把当前用户放入`ctx.state`中：
+
+```javascript
+app.use(async (ctx, next) => {
+    var user = tryGetUserFromCookie(ctx.request);
+    if (user) {
+        ctx.state.user = user;
+        await next();
+    } else {
+        ctx.response.status = 403;
+    }
+});
+```
+
+这样就没有必要在每个Controller的async函数中都把user变量放入model中。

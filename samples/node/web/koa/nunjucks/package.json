@@ -1,0 +1,18 @@
+{
+  "name": "nunjucks",
+  "version": "1.0.0",
+  "description": " a nunjucks project",
+  "main": "app.js",
+  "dependencies": {
+    "nunjucks": "^3.2.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node app.js"
+  },
+  "keywords": [
+    "nunjucks"
+  ],
+  "author": "Russell Zhou",
+  "license": "ISC"
+}
