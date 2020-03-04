@@ -14,7 +14,21 @@ const conn = mysql.createConnection({
 
 const bodyParse = require('body-parser');
 app.use(bodyParse.urlencoded({ extended: false }));
-// 获取功能
+// 获取所有的数据
+app.get('/api/getheros', (req, res) => {
+        // 定义SQL语句
+        const sqlStr = 'select * from user where isDel=0'
+        conn.query(sqlStr, (err, results) => {
+            console.log(results)
+            if (err) return res.json({ err_code: 1, message: '获取失败', affectedRows: 0 })
+            res.json({
+                err_code: 0,
+                message: results,
+                affectedRows: 0
+            })
+        })
+    })
+    // 按id获取人物功能
 app.get('/api/getheros', (req, res) => {
     const id = req.query.id;
     const sqlStr = 'Select * from user where id = ?';
@@ -25,7 +39,7 @@ app.get('/api/getheros', (req, res) => {
         res.json({ err_code: 0, message: results[0], affectedRows: 0 })
     })
 });
-// 删除功能
+// 删除人物功能
 app.get('/api/delhero', (req, res) => {
         const id = req.query.id;
         console.log("affectedRow is ", req.query);
@@ -36,7 +50,7 @@ app.get('/api/delhero', (req, res) => {
             res.json({ err_code: 0, message: '删除人物成功', affectedRows: results.affectedRows })
         })
     })
-    // 添加功能
+    // 添加人物功能
 app.post('/api/addhero', (req, res) => {
     const hero = req.body;
     console.log("affectedRow is", hero);
@@ -48,7 +62,7 @@ app.post('/api/addhero', (req, res) => {
     })
 })
 
-// 修改功能
+// 修改人物功能
 app.post('/api/updatehero', (req, res) => {
     const hero = req.body;
     console.log("affectedRow is", hero);
