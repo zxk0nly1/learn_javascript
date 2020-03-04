@@ -1,0 +1,16 @@
+{
+    "name": "koa",
+    "version": "1.0.0",
+    "description": "",
+    "main": "app.js",
+    "dependencies": {
+        "koa": "^2.11.0"
+    },
+    "devDependencies": {},
+    "scripts": {
+        "start": "node app.js"
+    },
+    "keywords": [],
+    "author": "Russell Zhou",
+    "license": "ISC"
+}
